@@ -19,6 +19,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Debug - Check secrets
+        run: |
+          if [ -z "${{ secrets.KAMAL_REGISTRY_USERNAME }}" ]; then
+            echo "❌ KAMAL_REGISTRY_USERNAME is empty!"
+          else
+            echo "✅ KAMAL_REGISTRY_USERNAME is set (length: ${#KAMAL_REGISTRY_USERNAME})"
+          fi
+          if [ -z "${{ secrets.KAMAL_REGISTRY_PASSWORD }}" ]; then
+            echo "❌ KAMAL_REGISTRY_PASSWORD is empty!"
+          else
+            echo "✅ KAMAL_REGISTRY_PASSWORD is set"
+          fi
+          if [ -z "${{ secrets.RESEND_API_KEY }}" ]; then
+            echo "❌ RESEND_API_KEY is empty!"
+          else
+            echo "✅ RESEND_API_KEY is set"
+          fi
+
       - name: Check and install Ruby if needed
         run: |
           if ! command -v ruby &> /dev/null; then

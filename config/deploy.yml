@@ -7,15 +7,17 @@ builder:
   arch: arm64
 
 registry:
-  server: docker.io
-  username: regedarek
+  username:
+    - KAMAL_REGISTRY_USERNAME
+  password:
+    - KAMAL_REGISTRY_PASSWORD
 
 retain_containers: 3
 
 servers:
   web:
     hosts:
-      - 127.0.0.1
+      - pi5main.local
 
 deploy_timeout: 120
 
