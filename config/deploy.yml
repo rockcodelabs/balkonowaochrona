@@ -18,7 +18,7 @@ retain_containers: 3
 servers:
   web:
     hosts:
-      - pi5main.local
+      - 127.0.0.1
 
 deploy_timeout: 120
 
