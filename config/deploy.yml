@@ -22,7 +22,7 @@ servers:
 deploy_timeout: 120
 
 proxy:
-  ssl: true
+  ssl: false
   host: balkonowaochrona.pl
   app_port: 4001
   healthcheck:
