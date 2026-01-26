@@ -1,4 +1,7 @@
 name: Deploy to Production
+concurrency:
+  group: production
+  cancel-in-progress: true
 
 on:
   push:
@@ -6,36 +9,53 @@ on:
       - main
   workflow_dispatch:
 
-concurrency:
-  group: deploy-production
-  cancel-in-progress: true
-
-env:
-  DOCKER_BUILDKIT: 1
-
 jobs:
   deploy:
-    name: Deploy to Raspberry Pi 5
     runs-on: self-hosted
     timeout-minutes: 20
+    env:
+      DOCKER_BUILDKIT: 1
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Login to Docker Hub
-        run: echo "${{ secrets.KAMAL_REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.KAMAL_REGISTRY_USERNAME }}" --password-stdin
+      - name: Check and install Ruby if needed
+        run: |
+          if ! command -v ruby &> /dev/null; then
+            echo "Ruby not found, installing..."
+            sudo apt-get update -qq
+            sudo apt-get install -y ruby-full
+          fi
+          ruby -v
+
+      - name: Setup Ruby gem paths
+        run: |
+          echo "GEM_HOME=$(ruby -r rubygems -e 'puts Gem.user_dir')" >> $GITHUB_ENV
+          echo "$(ruby -r rubygems -e 'puts Gem.user_dir')/bin" >> $GITHUB_PATH
 
       - name: Install Kamal
         run: |
-          gem install kamal -v '~> 2.0' --no-document --user-install
-          echo "$HOME/.local/share/gem/ruby/3.3.0/bin" >> $GITHUB_PATH
+          if ! command -v kamal &> /dev/null; then
+            gem install kamal --no-document
+          fi
+          kamal version
 
-      - name: Deploy with Kamal
-        env:
-          KAMAL_REGISTRY_USERNAME: ${{ secrets.KAMAL_REGISTRY_USERNAME }}
-          KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      - name: Set secrets
         run: |
-          export PATH="$HOME/.local/share/gem/ruby/3.3.0/bin:$PATH"
-          kamal deploy --skip-registry-login
+          echo "KAMAL_REGISTRY_USERNAME=${{ secrets.KAMAL_REGISTRY_USERNAME }}" >> $GITHUB_ENV
+          echo "KAMAL_REGISTRY_PASSWORD=${{ secrets.KAMAL_REGISTRY_PASSWORD }}" >> $GITHUB_ENV
+          echo "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}" >> $GITHUB_ENV
+
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.KAMAL_REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.KAMAL_REGISTRY_USERNAME }}" --password-stdin
+
+      - name: Release deploy lock
+        run: kamal lock release || true
+
+      - name: Deploy
+        run: kamal deploy
+
+      - name: Cleanup old Docker images
+        run: kamal prune all || true
+        continue-on-error: true
