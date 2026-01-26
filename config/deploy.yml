@@ -1,0 +1,43 @@
+service: balkonowaochrona
+
+image: regedarek/balkonowaochrona
+
+builder:
+  dockerfile: Dockerfile
+  arch: arm64
+
+registry:
+  username:
+    - KAMAL_REGISTRY_USERNAME
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+retain_containers: 3
+
+servers:
+  web:
+    hosts:
+      - pi5main.local
+
+deploy_timeout: 120
+
+proxy:
+  ssl: true
+  host: balkonowaochrona.pl
+  app_port: 4001
+  healthcheck:
+    path: /
+    interval: 3
+    timeout: 5
+
+env:
+  clear:
+    NODE_ENV: production
+    PORT: 4001
+    TO_EMAIL: kalkowski123@gmail.com
+    FROM_EMAIL: onboarding@resend.dev
+  secret:
+    - RESEND_API_KEY
+
+ssh:
+  user: rege

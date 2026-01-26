@@ -1,6 +1,3 @@
-# Dependencies
-node_modules
-
 # Git
 .git
 .gitignore
@@ -23,21 +20,29 @@ Thumbs.db
 # Docker files (not needed inside container)
 Dockerfile
 .dockerignore
-docker-compose*.yml
 
 # Logs
 *.log
-npm-debug.log*
-
-# Test files
-*.test.js
-*.spec.js
-__tests__
 
 # Development files
 .env
 .env.local
 .env.*.local
 
-# Keep package-lock.json (don't ignore it)
-!package-lock.json
+# Kamal/deployment files
+.kamal
+config
+.github
+.ruby-version
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Start script (not needed in container)
+start.sh

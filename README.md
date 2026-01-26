@@ -41,41 +41,43 @@ balkonowaochrona/
 2. Go to API Keys and create a new API key
 3. (Optional) Add and verify your domain for custom "from" addresses
 
-### 2. Store API Key in Bitwarden
+### 2. Store API Key in Bitwarden Secrets Manager
 
-1. Install Bitwarden CLI:
+1. Install Bitwarden Secrets Manager CLI:
    ```bash
-   brew install bitwarden-cli
+   brew install bitwarden/tap/bws
    ```
 
-2. Log in to Bitwarden:
-   ```bash
-   bw login
-   ```
+2. Create a secret in Bitwarden Secrets Manager:
+   - Go to **Secrets Manager** → **Sekrety**
+   - Create a new secret named `kalkowski-resend` (or any name)
+   - Set the value to your Resend API key (e.g., `re_xxxxxxxx`)
+   - Note the **Secret ID** (e.g., `d52c593a-2d50-4856-aa77-b3de0150fd80`)
 
-3. Create a new login item in Bitwarden:
-   - **Name:** `resend-api-key`
-   - **Password:** Your Resend API key (e.g., `re_xxxxxxxx`)
-
-   Or via CLI:
-   ```bash
-   bw get template item | jq '.name="resend-api-key" | .login.password="re_your_api_key_here"' | bw encode | bw create item
-   ```
+3. Create a Machine Account access token:
+   - Go to **Konta dla maszyn** (Machine Accounts)
+   - Create or select a machine account
+   - Generate an access token
+   - Grant access to the secret
 
 ### 3. Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
+| `BWS_ACCESS_TOKEN` | Yes | Bitwarden Secrets Manager access token |
 | `RESEND_API_KEY` | Yes | Your Resend API key (fetched from Bitwarden) |
 | `TO_EMAIL` | No | Recipient email (default: kalkowski123@gmail.com) |
 | `FROM_EMAIL` | No | Sender email (default: onboarding@resend.dev) |
 | `PORT` | No | Server port (default: 4001) |
 
-## Running with Bitwarden (Recommended)
+## Running with Bitwarden Secrets Manager (Recommended)
 
 Use the provided start script that automatically fetches secrets from Bitwarden:
 
 ```bash
+# Set access token (from Machine Account)
+export BWS_ACCESS_TOKEN='your-access-token-here'
+
 # First run (builds the image)
 ./start.sh --build
 
@@ -84,10 +86,12 @@ Use the provided start script that automatically fetches secrets from Bitwarden:
 ```
 
 The script will:
-1. Check Bitwarden CLI is installed
-2. Log in / unlock your vault if needed
-3. Fetch the Resend API key from Bitwarden
+1. Check `bws` CLI is installed
+2. Verify `BWS_ACCESS_TOKEN` is set
+3. Fetch the Resend API key from Bitwarden Secrets Manager
 4. Start the Docker container with the secret
+
+**Note:** The secret ID `d52c593a-2d50-4856-aa77-b3de0150fd80` is configured in `start.sh`.
 
 ## Running with Docker Manually
 
@@ -118,10 +122,11 @@ docker stop balkonowa && docker rm balkonowa
 
 ## Running with Docker Compose
 
-### With Bitwarden (recommended):
+### With Bitwarden Secrets Manager (recommended):
 
 ```bash
-export RESEND_API_KEY=$(bw get password resend-api-key)
+export BWS_ACCESS_TOKEN='your-access-token'
+export RESEND_API_KEY=$(bws secret get d52c593a-2d50-4856-aa77-b3de0150fd80 --output json | jq -r '.value')
 docker-compose up -d
 ```
 
@@ -166,7 +171,8 @@ npm install
 ### 2. Set environment variables and run:
 
 ```bash
-export RESEND_API_KEY=$(bw get password resend-api-key)
+export BWS_ACCESS_TOKEN='your-access-token'
+export RESEND_API_KEY=$(bws secret get d52c593a-2d50-4856-aa77-b3de0150fd80 --output json | jq -r '.value')
 npm start
 ```
 
@@ -241,17 +247,17 @@ The contact form sends emails via Resend API with the following fields:
 
 ## Troubleshooting
 
-### Bitwarden CLI issues
+### Bitwarden Secrets Manager CLI issues
 
 ```bash
-# Check status
-bw status
+# Test secret access
+bws secret get d52c593a-2d50-4856-aa77-b3de0150fd80
 
-# Force sync
-bw sync
+# List all secrets (if you have access)
+bws secret list
 
-# Unlock vault
-export BW_SESSION=$(bw unlock --raw)
+# Check access token is set
+echo $BWS_ACCESS_TOKEN
 ```
 
 ### Container issues

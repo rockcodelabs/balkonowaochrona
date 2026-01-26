@@ -1,12 +1,15 @@
 #!/bin/bash
 set -e
 
-# Balkonowa Ochrona - Start script with Bitwarden secrets
+# Balkonowa Ochrona - Start script with Bitwarden Password Manager
 # Usage: ./start.sh [--build]
 
 CONTAINER_NAME="balkonowa"
-IMAGE_NAME="balkonowa-ochrona"
+IMAGE_NAME="balkonowa-ochrona:go"
 PORT=4001
+
+# Bitwarden item name for Resend API key
+BW_ITEM_NAME="kalkowski-resend"
 
 # Colors for output
 RED='\033[0;31m'
@@ -19,7 +22,10 @@ echo -e "${GREEN}🏠 Balkonowa Ochrona - Starting...${NC}"
 # Check if Bitwarden CLI is installed
 if ! command -v bw &> /dev/null; then
     echo -e "${RED}❌ Bitwarden CLI (bw) is not installed.${NC}"
-    echo "Install it with: brew install bitwarden-cli"
+    echo ""
+    echo "Install it with:"
+    echo "  brew install bitwarden-cli"
+    echo ""
     echo "Or visit: https://bitwarden.com/help/cli/"
     exit 1
 fi
@@ -46,18 +52,16 @@ fi
 echo -e "${GREEN}🔄 Syncing Bitwarden vault...${NC}"
 bw sync
 
-# Fetch Resend API key from Bitwarden
-# The item should be named "resend-api-key" or you can use the item ID
+# Fetch Resend API key from Bitwarden (stored in notes field)
 echo -e "${GREEN}🔑 Fetching Resend API key from Bitwarden...${NC}"
 
-RESEND_API_KEY=$(bw get password "resend-api-key" 2>/dev/null) || {
-    echo -e "${RED}❌ Could not find 'resend-api-key' in Bitwarden.${NC}"
+RESEND_API_KEY=$(bw get notes "$BW_ITEM_NAME" 2>/dev/null) || {
+    echo -e "${RED}❌ Could not find '$BW_ITEM_NAME' in Bitwarden.${NC}"
     echo ""
-    echo "Please create a login item in Bitwarden with:"
-    echo "  - Name: resend-api-key"
-    echo "  - Password: your Resend API key"
+    echo "Please create a secure note in Bitwarden with:"
+    echo "  - Name: $BW_ITEM_NAME"
+    echo "  - Notes: your Resend API key (e.g., re_xxxxxxxx)"
     echo ""
-    echo "Or use a custom field. You can also use the item ID instead of the name."
     exit 1
 }
 
@@ -89,7 +93,7 @@ docker run -d \
     -e FROM_EMAIL="onboarding@resend.dev" \
     $IMAGE_NAME
 
-# Wait for container to be healthy
+# Wait for container to be ready
 echo -e "${GREEN}⏳ Waiting for container to be ready...${NC}"
 sleep 2
 
@@ -97,8 +101,6 @@ sleep 2
 if docker ps | grep -q $CONTAINER_NAME; then
     echo -e "${GREEN}✅ Container is running!${NC}"
     echo -e "${GREEN}🌐 Website available at: http://localhost:$PORT${NC}"
-    echo ""
-    docker logs $CONTAINER_NAME
 else
     echo -e "${RED}❌ Container failed to start${NC}"
     docker logs $CONTAINER_NAME
