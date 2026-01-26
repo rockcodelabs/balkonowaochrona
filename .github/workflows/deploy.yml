@@ -50,11 +50,25 @@ jobs:
         run: |
           echo "${{ secrets.KAMAL_REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.KAMAL_REGISTRY_USERNAME }}" --password-stdin
 
+      - name: Build and push Docker image
+        run: |
+          IMAGE_NAME="regedarek/balkonowaochrona"
+          VERSION=$(git rev-parse --short HEAD)
+          
+          echo "Building image: ${IMAGE_NAME}:${VERSION}"
+          docker build --platform linux/arm64 -t ${IMAGE_NAME}:${VERSION} -t ${IMAGE_NAME}:latest .
+          
+          echo "Pushing image..."
+          docker push ${IMAGE_NAME}:${VERSION}
+          docker push ${IMAGE_NAME}:latest
+          
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
       - name: Release deploy lock
         run: kamal lock release || true
 
-      - name: Deploy
-        run: kamal deploy
+      - name: Deploy with Kamal (skip push)
+        run: kamal deploy --skip-push
 
       - name: Cleanup old Docker images
         run: kamal prune all || true
