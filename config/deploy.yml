@@ -26,6 +26,8 @@ proxy:
   hosts:
     - balkonowaochrona.pl
     - www.balkonowaochrona.pl
+    - siatkanakota.pl
+    - www.siatkanakota.pl
   app_port: 4001
   healthcheck:
     path: /
