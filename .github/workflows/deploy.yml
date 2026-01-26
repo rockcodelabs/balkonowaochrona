@@ -38,4 +38,4 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |
           export PATH="$HOME/.local/share/gem/ruby/3.3.0/bin:$PATH"
-          kamal deploy
+          kamal deploy --skip-registry-login
