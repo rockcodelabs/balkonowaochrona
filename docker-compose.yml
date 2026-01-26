@@ -1,0 +1,24 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: balkonowa-ochrona:distroless
+    container_name: balkonowa
+    ports:
+      - "4001:4001"
+    environment:
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - TO_EMAIL=${TO_EMAIL:-kalkowski123@gmail.com}
+      - FROM_EMAIL=${FROM_EMAIL:-onboarding@resend.dev}
+      - PORT=4001
+    restart: unless-stopped
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M

@@ -1,0 +1,27 @@
+{
+  "name": "balkonowa-ochrona",
+  "version": "1.0.0",
+  "description": "Balkonowa Ochrona - Static website with Resend email integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "esbuild server.js --bundle --platform=node --target=node20 --outfile=dist/server.js --minify"
+  },
+  "dependencies": {
+    "resend": "^2.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "balkonowa-ochrona",
+    "resend",
+    "contact-form"
+  ],
+  "author": "Balkonowa Ochrona",
+  "license": "ISC"
+}

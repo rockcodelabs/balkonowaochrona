@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+LICENSE
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (not needed inside container)
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+*.test.js
+*.spec.js
+__tests__
+
+# Development files
+.env
+.env.local
+.env.*.local
+
+# Keep package-lock.json (don't ignore it)
+!package-lock.json
