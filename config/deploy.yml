@@ -8,10 +8,7 @@ builder:
 
 registry:
   server: docker.io
-  username:
-    - KAMAL_REGISTRY_USERNAME
-  password:
-    - KAMAL_REGISTRY_PASSWORD
+  username: regedarek
 
 retain_containers: 3
 
