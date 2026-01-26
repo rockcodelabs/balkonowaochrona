@@ -19,33 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug - Check secrets
-        run: |
-          if [ -z "${{ secrets.KAMAL_REGISTRY_USERNAME }}" ]; then
-            echo "❌ KAMAL_REGISTRY_USERNAME is empty!"
-          else
-            echo "✅ KAMAL_REGISTRY_USERNAME is set (length: ${#KAMAL_REGISTRY_USERNAME})"
-          fi
-          if [ -z "${{ secrets.KAMAL_REGISTRY_PASSWORD }}" ]; then
-            echo "❌ KAMAL_REGISTRY_PASSWORD is empty!"
-          else
-            echo "✅ KAMAL_REGISTRY_PASSWORD is set"
-          fi
-          if [ -z "${{ secrets.RESEND_API_KEY }}" ]; then
-            echo "❌ RESEND_API_KEY is empty!"
-          else
-            echo "✅ RESEND_API_KEY is set"
-          fi
-
-      - name: Check and install Ruby if needed
-        run: |
-          if ! command -v ruby &> /dev/null; then
-            echo "Ruby not found, installing..."
-            sudo apt-get update -qq
-            sudo apt-get install -y ruby-full
-          fi
-          ruby -v
-
       - name: Setup Ruby gem paths
         run: |
           echo "GEM_HOME=$(ruby -r rubygems -e 'puts Gem.user_dir')" >> $GITHUB_ENV
@@ -58,35 +31,13 @@ jobs:
           fi
           kamal version
 
-      - name: Set secrets
+      - name: Copy secrets file
         run: |
-          echo "KAMAL_REGISTRY_USERNAME=${{ secrets.KAMAL_REGISTRY_USERNAME }}" >> $GITHUB_ENV
-          echo "KAMAL_REGISTRY_PASSWORD=${{ secrets.KAMAL_REGISTRY_PASSWORD }}" >> $GITHUB_ENV
-          echo "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}" >> $GITHUB_ENV
+          mkdir -p .kamal
+          cp ~/.kamal-secrets/balkonowaochrona .kamal/secrets
 
-      - name: Login to Docker Hub
-        run: |
-          echo "${{ secrets.KAMAL_REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.KAMAL_REGISTRY_USERNAME }}" --password-stdin
-
-      - name: Build and push Docker image
-        run: |
-          IMAGE_NAME="regedarek/balkonowaochrona"
-          VERSION=$(git rev-parse --short HEAD)
-          
-          echo "Building image: ${IMAGE_NAME}:${VERSION}"
-          docker build --platform linux/arm64 -t ${IMAGE_NAME}:${VERSION} -t ${IMAGE_NAME}:latest .
-          
-          echo "Pushing image..."
-          docker push ${IMAGE_NAME}:${VERSION}
-          docker push ${IMAGE_NAME}:latest
-          
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-
-      - name: Release deploy lock
-        run: kamal lock release || true
-
-      - name: Deploy with Kamal (skip push)
-        run: kamal deploy --skip-push
+      - name: Deploy
+        run: kamal deploy
 
       - name: Cleanup old Docker images
         run: kamal prune all || true
