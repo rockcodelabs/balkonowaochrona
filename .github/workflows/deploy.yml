@@ -46,15 +46,23 @@ jobs:
         run: |
           echo "Fetching secrets from Bitwarden Secrets Manager..."
           
-          # Fetch each secret by ID and export as environment variable
-          export KAMAL_REGISTRY_USERNAME=$(bws secret get ${{ secrets.BW_SECRET_REGISTRY_USERNAME }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
-          export KAMAL_REGISTRY_PASSWORD=$(bws secret get ${{ secrets.BW_SECRET_REGISTRY_PASSWORD }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
-          export RESEND_API_KEY=$(bws secret get ${{ secrets.BW_SECRET_BALKONOWAOCHRONA_RESEND_API_KEY }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
+          # Fetch each secret by ID
+          KAMAL_REGISTRY_USERNAME=$(bws secret get ${{ secrets.BW_SECRET_REGISTRY_USERNAME }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
+          KAMAL_REGISTRY_PASSWORD=$(bws secret get ${{ secrets.BW_SECRET_REGISTRY_PASSWORD }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
+          RESEND_API_KEY=$(bws secret get ${{ secrets.BW_SECRET_BALKONOWAOCHRONA_RESEND_API_KEY }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
           
           # Save to GITHUB_ENV for subsequent steps
           echo "KAMAL_REGISTRY_USERNAME=$KAMAL_REGISTRY_USERNAME" >> $GITHUB_ENV
           echo "KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD" >> $GITHUB_ENV
           echo "RESEND_API_KEY=$RESEND_API_KEY" >> $GITHUB_ENV
+          
+          # Also write to .kamal/secrets file for Kamal to read
+          mkdir -p .kamal
+          cat > .kamal/secrets << SECRET_FILE
+KAMAL_REGISTRY_USERNAME=$KAMAL_REGISTRY_USERNAME
+KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD
+RESEND_API_KEY=$RESEND_API_KEY
+SECRET_FILE
           
           # Verify secrets are set (without exposing values)
           [[ -n "$KAMAL_REGISTRY_USERNAME" ]] && echo "✅ KAMAL_REGISTRY_USERNAME fetched" || { echo "❌ KAMAL_REGISTRY_USERNAME missing"; exit 1; }
@@ -88,16 +96,12 @@ jobs:
 
       - name: Login to Docker Hub
         run: |
-          echo "${{ env.KAMAL_REGISTRY_PASSWORD }}" | docker login -u "${{ env.KAMAL_REGISTRY_USERNAME }}" --password-stdin
+          echo "$KAMAL_REGISTRY_PASSWORD" | docker login -u "$KAMAL_REGISTRY_USERNAME" --password-stdin
 
       - name: Release deploy lock
         run: kamal lock release || true
 
       - name: Deploy
-        env:
-          KAMAL_REGISTRY_USERNAME: ${{ env.KAMAL_REGISTRY_USERNAME }}
-          KAMAL_REGISTRY_PASSWORD: ${{ env.KAMAL_REGISTRY_PASSWORD }}
-          RESEND_API_KEY: ${{ env.RESEND_API_KEY }}
         run: kamal deploy
 
       - name: Cleanup old Docker images
