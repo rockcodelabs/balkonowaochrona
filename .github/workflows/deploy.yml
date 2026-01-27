@@ -11,13 +11,68 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, ARM64]
     timeout-minutes: 20
     env:
       DOCKER_BUILDKIT: 1
 
     steps:
       - uses: actions/checkout@v4
+
+      # Install Bitwarden Secrets Manager CLI
+      - name: Install Bitwarden Secrets Manager CLI
+        run: |
+          if ! command -v bws &> /dev/null; then
+            echo "Installing Bitwarden Secrets Manager CLI v1.0.0..."
+            
+            # Download ARM64 binary for v1.0.0
+            curl -L -o bws-aarch64-unknown-linux-gnu.zip \
+              "https://github.com/bitwarden/sdk-sm/releases/download/bws-v1.0.0/bws-aarch64-unknown-linux-gnu-1.0.0.zip"
+            
+            unzip -o bws-aarch64-unknown-linux-gnu.zip
+            chmod +x bws
+            sudo mv bws /usr/local/bin/
+            rm bws-aarch64-unknown-linux-gnu.zip
+          else
+            echo "✅ Bitwarden Secrets Manager CLI already installed"
+          fi
+          
+          bws --version
+
+      # Fetch secrets from Bitwarden Secrets Manager
+      - name: Get Secrets from Bitwarden
+        env:
+          BWS_ACCESS_TOKEN: ${{ secrets.BW_ACCESS_TOKEN }}
+        run: |
+          echo "Fetching secrets from Bitwarden Secrets Manager..."
+          
+          # Fetch each secret by ID and export as environment variable
+          export KAMAL_REGISTRY_USERNAME=$(bws secret get ${{ secrets.BW_SECRET_REGISTRY_USERNAME }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
+          export KAMAL_REGISTRY_PASSWORD=$(bws secret get ${{ secrets.BW_SECRET_REGISTRY_PASSWORD }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
+          export RESEND_API_KEY=$(bws secret get ${{ secrets.BW_SECRET_BALKONOWAOCHRONA_RESEND_API_KEY }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
+          
+          # Save to GITHUB_ENV for subsequent steps
+          echo "KAMAL_REGISTRY_USERNAME=$KAMAL_REGISTRY_USERNAME" >> $GITHUB_ENV
+          echo "KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD" >> $GITHUB_ENV
+          echo "RESEND_API_KEY=$RESEND_API_KEY" >> $GITHUB_ENV
+          
+          # Verify secrets are set (without exposing values)
+          [[ -n "$KAMAL_REGISTRY_USERNAME" ]] && echo "✅ KAMAL_REGISTRY_USERNAME fetched" || { echo "❌ KAMAL_REGISTRY_USERNAME missing"; exit 1; }
+          [[ -n "$KAMAL_REGISTRY_PASSWORD" ]] && echo "✅ KAMAL_REGISTRY_PASSWORD fetched" || { echo "❌ KAMAL_REGISTRY_PASSWORD missing"; exit 1; }
+          [[ -n "$RESEND_API_KEY" ]] && echo "✅ RESEND_API_KEY fetched" || { echo "❌ RESEND_API_KEY missing"; exit 1; }
+          
+          echo ""
+          echo "✅ All secrets fetched successfully from Bitwarden Secrets Manager!"
+
+      - name: Install jq
+        run: |
+          if ! command -v jq &> /dev/null; then
+            echo "Installing jq..."
+            sudo apt-get update -qq
+            sudo apt-get install -y jq
+          else
+            echo "✅ jq already installed"
+          fi
 
       - name: Setup Ruby gem paths
         run: |
@@ -31,10 +86,12 @@ jobs:
           fi
           kamal version
 
-      - name: Copy secrets file
+      - name: Login to Docker Hub
         run: |
-          mkdir -p .kamal
-          cp ~/.kamal-secrets/balkonowaochrona .kamal/secrets
+          echo "${{ env.KAMAL_REGISTRY_PASSWORD }}" | docker login -u "${{ env.KAMAL_REGISTRY_USERNAME }}" --password-stdin
+
+      - name: Release deploy lock
+        run: kamal lock release || true
 
       - name: Deploy
         run: kamal deploy
