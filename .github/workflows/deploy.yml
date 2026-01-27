@@ -94,6 +94,10 @@ jobs:
         run: kamal lock release || true
 
       - name: Deploy
+        env:
+          KAMAL_REGISTRY_USERNAME: ${{ env.KAMAL_REGISTRY_USERNAME }}
+          KAMAL_REGISTRY_PASSWORD: ${{ env.KAMAL_REGISTRY_PASSWORD }}
+          RESEND_API_KEY: ${{ env.RESEND_API_KEY }}
         run: kamal deploy
 
       - name: Cleanup old Docker images
