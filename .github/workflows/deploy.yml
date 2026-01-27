@@ -25,7 +25,6 @@ jobs:
           if ! command -v bws &> /dev/null; then
             echo "Installing Bitwarden Secrets Manager CLI v1.0.0..."
             
-            # Download ARM64 binary for v1.0.0
             curl -L -o bws-aarch64-unknown-linux-gnu.zip \
               "https://github.com/bitwarden/sdk-sm/releases/download/bws-v1.0.0/bws-aarch64-unknown-linux-gnu-1.0.0.zip"
             
@@ -56,13 +55,11 @@ jobs:
           echo "KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD" >> $GITHUB_ENV
           echo "RESEND_API_KEY=$RESEND_API_KEY" >> $GITHUB_ENV
           
-          # Also write to .kamal/secrets file for Kamal to read
+          # Create .kamal/secrets file for Kamal to read
           mkdir -p .kamal
-          cat > .kamal/secrets << SECRET_FILE
-KAMAL_REGISTRY_USERNAME=$KAMAL_REGISTRY_USERNAME
-KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD
-RESEND_API_KEY=$RESEND_API_KEY
-SECRET_FILE
+          echo "KAMAL_REGISTRY_USERNAME=$KAMAL_REGISTRY_USERNAME" > .kamal/secrets
+          echo "KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD" >> .kamal/secrets
+          echo "RESEND_API_KEY=$RESEND_API_KEY" >> .kamal/secrets
           
           # Verify secrets are set (without exposing values)
           [[ -n "$KAMAL_REGISTRY_USERNAME" ]] && echo "✅ KAMAL_REGISTRY_USERNAME fetched" || { echo "❌ KAMAL_REGISTRY_USERNAME missing"; exit 1; }
@@ -70,7 +67,7 @@ SECRET_FILE
           [[ -n "$RESEND_API_KEY" ]] && echo "✅ RESEND_API_KEY fetched" || { echo "❌ RESEND_API_KEY missing"; exit 1; }
           
           echo ""
-          echo "✅ All secrets fetched successfully from Bitwarden Secrets Manager!"
+          echo "✅ All secrets fetched successfully and written to .kamal/secrets!"
 
       - name: Install jq
         run: |
