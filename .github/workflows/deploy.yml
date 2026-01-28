@@ -12,174 +12,72 @@ on:
 jobs:
   deploy:
     runs-on: [self-hosted, Linux, ARM64]
-    timeout-minutes: 20
+    timeout-minutes: 10
     env:
       DOCKER_BUILDKIT: 1
+      IMAGE_NAME: regedarek/balkonowaochrona
+      CONTAINER_NAME: balkonowaochrona
 
     steps:
       - uses: actions/checkout@v4
 
-      # Install Bitwarden Secrets Manager CLI
-      - name: Install Bitwarden Secrets Manager CLI
+      - name: Install dependencies
         run: |
-          if ! command -v bws &> /dev/null; then
-            echo "Installing Bitwarden Secrets Manager CLI v1.0.0..."
-            
-            curl -L -o bws-aarch64-unknown-linux-gnu.zip \
-              "https://github.com/bitwarden/sdk-sm/releases/download/bws-v1.0.0/bws-aarch64-unknown-linux-gnu-1.0.0.zip"
-            
-            unzip -o bws-aarch64-unknown-linux-gnu.zip
-            chmod +x bws
-            sudo mv bws /usr/local/bin/
-            rm bws-aarch64-unknown-linux-gnu.zip
-          else
-            echo "✅ Bitwarden Secrets Manager CLI already installed"
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get update -qq && sudo apt-get install -y jq
           fi
-          
-          bws --version
+          if ! command -v bws &> /dev/null; then
+            curl -L -o bws.zip "https://github.com/bitwarden/sdk-sm/releases/download/bws-v1.0.0/bws-aarch64-unknown-linux-gnu-1.0.0.zip"
+            unzip -o bws.zip && chmod +x bws && sudo mv bws /usr/local/bin/ && rm bws.zip
+          fi
 
-      # Fetch secrets from Bitwarden Secrets Manager
       - name: Get Secrets from Bitwarden
         env:
           BWS_ACCESS_TOKEN: ${{ secrets.BW_ACCESS_TOKEN }}
         run: |
-          echo "Fetching secrets from Bitwarden Secrets Manager..."
-          
-          # Fetch each secret by ID
           KAMAL_REGISTRY_USERNAME=$(bws secret get ${{ secrets.BW_SECRET_REGISTRY_USERNAME }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
           KAMAL_REGISTRY_PASSWORD=$(bws secret get ${{ secrets.BW_SECRET_REGISTRY_PASSWORD }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
           RESEND_API_KEY=$(bws secret get ${{ secrets.BW_SECRET_BALKONOWAOCHRONA_RESEND_API_KEY }} --access-token "$BWS_ACCESS_TOKEN" | jq -r '.value')
           
-          # Save to GITHUB_ENV for subsequent steps
           echo "KAMAL_REGISTRY_USERNAME=$KAMAL_REGISTRY_USERNAME" >> $GITHUB_ENV
           echo "KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD" >> $GITHUB_ENV
           echo "RESEND_API_KEY=$RESEND_API_KEY" >> $GITHUB_ENV
           
-          # Create .kamal/secrets file for Kamal to read
-          mkdir -p .kamal
-          echo "KAMAL_REGISTRY_USERNAME=$KAMAL_REGISTRY_USERNAME" > .kamal/secrets
-          echo "KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD" >> .kamal/secrets
-          echo "RESEND_API_KEY=$RESEND_API_KEY" >> .kamal/secrets
-          
-          # Verify secrets are set (without exposing values)
-          [[ -n "$KAMAL_REGISTRY_USERNAME" ]] && echo "✅ KAMAL_REGISTRY_USERNAME fetched" || { echo "❌ KAMAL_REGISTRY_USERNAME missing"; exit 1; }
-          [[ -n "$KAMAL_REGISTRY_PASSWORD" ]] && echo "✅ KAMAL_REGISTRY_PASSWORD fetched" || { echo "❌ KAMAL_REGISTRY_PASSWORD missing"; exit 1; }
-          [[ -n "$RESEND_API_KEY" ]] && echo "✅ RESEND_API_KEY fetched" || { echo "❌ RESEND_API_KEY missing"; exit 1; }
-          
-          echo ""
-          echo "✅ All secrets fetched successfully and written to .kamal/secrets!"
-
-      - name: Install jq
-        run: |
-          if ! command -v jq &> /dev/null; then
-            echo "Installing jq..."
-            sudo apt-get update -qq
-            sudo apt-get install -y jq
-          else
-            echo "✅ jq already installed"
-          fi
-
-      - name: Configure hostname resolution
-        run: |
-          # Map pi5main.local to localhost for runner container
-          echo "127.0.0.1 pi5main.local" | sudo tee -a /etc/hosts
-          echo "✅ Added pi5main.local to /etc/hosts"
-
-      - name: Set up Ruby 3.2.2 with ruby-build
-        run: |
-          RUBY_VERSION="3.2.2"
-          RUBY_INSTALL_DIR="/opt/hostedtoolcache/Ruby/${RUBY_VERSION}/arm64"
-
-          # Check if Ruby is already installed in tool cache
-          if [ -f "${RUBY_INSTALL_DIR}.complete" ]; then
-            echo "✅ Ruby ${RUBY_VERSION} already installed in tool cache"
-          else
-            echo "Installing Ruby ${RUBY_VERSION} to tool cache..."
-
-            # Install ruby-build if not present
-            if ! command -v ruby-build &> /dev/null; then
-              echo "Installing ruby-build..."
-              git clone https://github.com/rbenv/ruby-build.git /tmp/ruby-build
-              sudo /tmp/ruby-build/install.sh
-              rm -rf /tmp/ruby-build
-            fi
-
-            # Install build dependencies
-            sudo apt-get update -qq
-            sudo apt-get install -y build-essential libssl-dev libreadline-dev zlib1g-dev
-
-            # Create tool cache directory
-            sudo mkdir -p /opt/hostedtoolcache/Ruby
-            sudo chown -R $USER:$USER /opt/hostedtoolcache
-
-            # Build Ruby
-            ruby-build ${RUBY_VERSION} ${RUBY_INSTALL_DIR}
-
-            # Mark as complete
-            touch ${RUBY_INSTALL_DIR}.complete
-
-            echo "✅ Ruby ${RUBY_VERSION} installed successfully"
-          fi
-
-          # Add Ruby to PATH
-          echo "${RUBY_INSTALL_DIR}/bin" >> $GITHUB_PATH
-
-          # Verify installation
-          ${RUBY_INSTALL_DIR}/bin/ruby -v
-
-      - name: Install Kamal
-        run: |
-          if ! command -v kamal &> /dev/null; then
-            gem install kamal --no-document
-          fi
-          kamal version
-
-      - name: Set up SSH for deployment
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-
-          # Generate SSH key if not exists
-          if [ ! -f ~/.ssh/id_ed25519 ]; then
-            ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -C "github-actions-runner"
-            echo "✅ Generated new SSH key"
-          else
-            echo "✅ SSH key already exists"
-          fi
-
-          # Add runner's public key to host's authorized_keys using Docker volume mount
-          echo "Adding SSH key to host..."
-          docker run --rm -v /home:/hosthome alpine sh -c "
-            mkdir -p /hosthome/rege/.ssh
-            chmod 700 /hosthome/rege/.ssh
-            grep -qF '$(cat ~/.ssh/id_ed25519.pub)' /hosthome/rege/.ssh/authorized_keys 2>/dev/null || echo '$(cat ~/.ssh/id_ed25519.pub)' >> /hosthome/rege/.ssh/authorized_keys
-            chmod 600 /hosthome/rege/.ssh/authorized_keys
-          "
-          echo "✅ SSH key added to host"
-
-          # Configure SSH client
-          cat > ~/.ssh/config << 'EOF'
-          Host pi5main.local localhost 127.0.0.1
-            User rege
-            IdentityFile ~/.ssh/id_ed25519
-            StrictHostKeyChecking no
-            UserKnownHostsFile /dev/null
-            IdentitiesOnly yes
-          EOF
-          chmod 600 ~/.ssh/config
-
-          echo "✅ SSH configured"
+          echo "✅ Secrets fetched"
 
       - name: Login to Docker Hub
+        run: echo "$KAMAL_REGISTRY_PASSWORD" | docker login -u "$KAMAL_REGISTRY_USERNAME" --password-stdin
+
+      - name: Build and push image
         run: |
-          echo "$KAMAL_REGISTRY_PASSWORD" | docker login -u "$KAMAL_REGISTRY_USERNAME" --password-stdin
+          docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:${{ github.sha }} .
+          docker push $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:${{ github.sha }}
 
-      - name: Release deploy lock
-        run: kamal lock release || true
+      - name: Deploy container
+        run: |
+          docker pull $IMAGE_NAME:latest
+          docker stop $CONTAINER_NAME || true
+          docker rm $CONTAINER_NAME || true
+          docker run -d \
+            --name $CONTAINER_NAME \
+            --restart unless-stopped \
+            --network host \
+            -e PORT=4001 \
+            -e TO_EMAIL=kalkowski123@gmail.com \
+            -e FROM_EMAIL=onboarding@resend.dev \
+            -e RESEND_API_KEY="$RESEND_API_KEY" \
+            $IMAGE_NAME:latest
+          
+          sleep 3
+          if docker ps | grep -q $CONTAINER_NAME; then
+            echo "✅ Deployed successfully"
+          else
+            echo "❌ Deploy failed"
+            docker logs $CONTAINER_NAME
+            exit 1
+          fi
 
-      - name: Deploy
-        run: kamal deploy
-
-      - name: Cleanup old Docker images
-        run: kamal prune all || true
+      - name: Cleanup
+        run: docker image prune -af --filter "until=24h" || true
         continue-on-error: true
