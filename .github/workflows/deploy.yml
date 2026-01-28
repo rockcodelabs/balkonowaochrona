@@ -56,28 +56,58 @@ jobs:
 
       - name: Deploy container
         run: |
+          # Pull latest image
           docker pull $IMAGE_NAME:latest
-          docker stop $CONTAINER_NAME || true
-          docker rm $CONTAINER_NAME || true
+          
+          # Stop and remove old container
+          docker stop $CONTAINER_NAME 2>/dev/null || true
+          docker rm $CONTAINER_NAME 2>/dev/null || true
+          
+          # Run new container on kamal network
           docker run -d \
             --name $CONTAINER_NAME \
             --restart unless-stopped \
-            --network host \
+            --network kamal \
             -e PORT=4001 \
             -e TO_EMAIL=dariusz.finster@gmail.com \
             -e FROM_EMAIL=onboarding@resend.dev \
             -e RESEND_API_KEY="$RESEND_API_KEY" \
             $IMAGE_NAME:latest
           
+          # Wait for container to be healthy
           sleep 3
+          
           if docker ps | grep -q $CONTAINER_NAME; then
-            echo "✅ Deployed successfully"
+            echo "✅ Container started"
           else
-            echo "❌ Deploy failed"
+            echo "❌ Container failed to start"
             docker logs $CONTAINER_NAME
             exit 1
           fi
 
-      - name: Cleanup
+      - name: Register with kamal-proxy
+        run: |
+          # Get new container ID
+          CONTAINER_ID=$(docker inspect $CONTAINER_NAME --format '{{.Id}}' | cut -c1-12)
+          
+          echo "Registering container $CONTAINER_ID with kamal-proxy..."
+          
+          # Register with kamal-proxy for all domains
+          docker exec kamal-proxy kamal-proxy deploy balkonowaochrona-web \
+            --target ${CONTAINER_ID}:4001 \
+            --host balkonowaochrona.pl \
+            --host www.balkonowaochrona.pl \
+            --host siatkanakota.pl \
+            --host www.siatkanakota.pl \
+            --health-check-path / \
+            --health-check-interval 3s \
+            --health-check-timeout 5s
+          
+          echo "✅ Registered with kamal-proxy"
+          
+          # Verify registration
+          docker exec kamal-proxy kamal-proxy list
+
+      - name: Cleanup old images
         run: docker image prune -af --filter "until=24h" || true
         continue-on-error: true

@@ -2,140 +2,97 @@
 
 Professional website for balcony protection services - pigeon net installation and balcony cleaning services.
 
-**Live:** https://balkonowaochrona.pl
+**Live:** https://balkonowaochrona.pl | https://siatkanakota.pl
+
+## Architecture
+
+```
+Internet → Cloudflare → Cloudflare Tunnel → Pi5 (localhost:80)
+                                               ↓
+                                          kamal-proxy
+                                               ↓
+                                    Docker container (port 4001)
+```
 
 ## Project Structure
 
 ```
 balkonowaochrona/
-├── main.go             # Go server with Resend email integration
-├── go.mod              # Go module definition
-├── index.html          # Main HTML page
-├── style.css           # Stylesheet
-├── favicon.svg         # Site favicon
-├── Dockerfile          # Optimized Docker configuration (7.7MB image)
+├── main.go              # Go server with Resend email integration
+├── index.html           # Main HTML page with gallery
+├── style.css            # Stylesheet
+├── photos/              # Gallery images
+├── favicon.svg          # Site favicon
+├── Dockerfile           # Multi-stage Docker build (~8MB image)
+├── go.mod               # Go module definition
 ├── config/
-│   └── deploy.yml      # Kamal deployment configuration
-├── .kamal/
-│   └── secrets         # Bitwarden secrets integration
+│   └── deploy.yml       # Kamal config (reference only)
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml  # GitHub Actions CI/CD
-├── start.sh            # Local start script with Bitwarden
-└── README.md           # This file
+│       └── deploy.yml   # GitHub Actions CI/CD
+├── CLAUDE.md            # AI assistant guide
+└── README.md            # This file
 ```
 
 ## Features
 
 - Clean, modern responsive design
+- Photo gallery with lightbox zoom
 - Contact form with email via Resend API
 - Mobile-friendly layout
-- Ultra-minimal Docker image (**7.7MB** using Go + scratch)
-- Deployed via Kamal to Raspberry Pi 5
-- Cloudflare Tunnel for secure access
+- Ultra-minimal Docker image (~8MB using Go + scratch)
+- Automated deployment via GitHub Actions
+- Cloudflare Tunnel for secure access (no exposed ports)
 
-## DNS Configuration
+## Infrastructure
 
-**Cloudflare Nameservers (for JDM.pl):**
-- `hope.ns.cloudflare.com`
-- `keaton.ns.cloudflare.com`
-
-**DNS Records:**
-| Type  | Name | Target |
-|-------|------|--------|
-| CNAME | @    | `c43349ad-0aba-4694-b89f-ac4e5acebcfe.cfargotunnel.com` |
-| CNAME | www  | `c43349ad-0aba-4694-b89f-ac4e5acebcfe.cfargotunnel.com` |
-
-## Prerequisites
-
-- Docker
-- Kamal (`gem install kamal`)
-- Bitwarden CLI (`brew install bitwarden-cli`)
-- Ruby 3.2.2 (for Kamal)
+| Component | Description |
+|-----------|-------------|
+| **Server** | Raspberry Pi 5 (`pi5main.local`) |
+| **Proxy** | kamal-proxy (routes by hostname) |
+| **Tunnel** | Cloudflare Tunnel (secure, no open ports) |
+| **Runner** | Self-hosted GitHub Actions (Docker on Pi) |
+| **Registry** | Docker Hub (`regedarek/balkonowaochrona`) |
 
 ## Local Development
 
-### Run with Docker:
+### Quick static preview:
 
 ```bash
-# Unlock Bitwarden
-export BW_SESSION=$(bw unlock --raw)
-
-# Start with Bitwarden secrets
-./start.sh --build
+python3 -m http.server 8080
+# Open http://localhost:8080
 ```
 
-Then open http://localhost:4001
-
-### Run with Go directly:
+### Full Docker test:
 
 ```bash
-go run main.go
+docker build -t balkonowaochrona-test .
+docker run --rm -p 4001:4001 -e RESEND_API_KEY="your_key" balkonowaochrona-test
+# Open http://localhost:4001
 ```
 
 ## Deployment
 
-### Automatic (GitHub Actions)
+### Automatic (recommended)
 
-Push to `main` branch → automatically deploys to Raspberry Pi 5
+Push to `main` branch → GitHub Actions automatically deploys to Pi
 
-### Manual
+### What happens on deploy:
 
-```bash
-# Unlock Bitwarden
-export BW_SESSION=$(bw unlock --raw)
-bw sync
+1. Runner builds Docker image
+2. Pushes to Docker Hub
+3. Stops old container, starts new one on `kamal` network
+4. Registers with kamal-proxy for domain routing
 
-# Deploy
-kamal deploy
-```
+## Secrets
 
-## Secrets (Bitwarden)
-
-Required items in Bitwarden Password Manager:
-
-| Item Name | Field | Description |
-|-----------|-------|-------------|
-| `registry-credentials` | username | Docker Hub username |
-| `registry-credentials` | password | Docker Hub password/token |
-| `kalkowski-resend` | notes | Resend API key |
-
-## GitHub Actions Secrets
+Managed via Bitwarden Secrets Manager, fetched at deploy time:
 
 | Secret | Description |
 |--------|-------------|
 | `KAMAL_REGISTRY_USERNAME` | Docker Hub username |
 | `KAMAL_REGISTRY_PASSWORD` | Docker Hub password |
-| `RESEND_API_KEY` | Resend API key |
-| `SSH_PRIVATE_KEY` | SSH key for Pi access |
-| `PI_HOST` | Pi hostname/IP |
-
-## Infrastructure
-
-- **Server:** Raspberry Pi 5 (`pi5main.local`)
-- **Proxy:** Kamal Proxy (port 80)
-- **Tunnel:** Cloudflare Tunnel (`kw-staging`)
-- **Image Size:** 7.7MB (Go binary + static files)
-
-## Cloudflare Tunnel Config
-
-Location on Pi: `/etc/cloudflared/config.yml`
-
-```yaml
-tunnel: c43349ad-0aba-4694-b89f-ac4e5acebcfe
-credentials-file: /root/.cloudflared/c43349ad-0aba-4694-b89f-ac4e5acebcfe.json
-
-ingress:
-  - hostname: panel.taterniczek.pl
-    service: http://localhost:80
-  - hostname: balkonowaochrona.pl
-    service: http://localhost:80
-  - hostname: www.balkonowaochrona.pl
-    service: http://localhost:80
-  - service: http_status:404
-```
-
-Restart tunnel: `sudo systemctl restart cloudflared`
+| `RESEND_API_KEY` | Resend API key for emails |
 
 ## Useful Commands
 
@@ -143,21 +100,34 @@ Restart tunnel: `sudo systemctl restart cloudflared`
 # SSH to Pi
 ssh rege@pi5main.local
 
-# Check containers
+# Check container status
 docker ps | grep balkonowa
 
 # View logs
-kamal app logs
+docker logs balkonowaochrona
 
-# Restart app
-kamal app boot
+# Restart container
+docker restart balkonowaochrona
+
+# Check proxy routing
+docker exec kamal-proxy kamal-proxy list
 
 # Check tunnel status
 sudo systemctl status cloudflared
-
-# Kamal proxy list
-docker exec kamal-proxy kamal-proxy list
 ```
+
+## DNS Configuration
+
+**Cloudflare Nameservers (configured at registrar):**
+- `hope.ns.cloudflare.com`
+- `keaton.ns.cloudflare.com`
+
+**DNS Records (in Cloudflare):**
+
+| Type  | Name | Target |
+|-------|------|--------|
+| CNAME | @    | `c43349ad-0aba-4694-b89f-ac4e5acebcfe.cfargotunnel.com` |
+| CNAME | www  | `c43349ad-0aba-4694-b89f-ac4e5acebcfe.cfargotunnel.com` |
 
 ## Contact
 
