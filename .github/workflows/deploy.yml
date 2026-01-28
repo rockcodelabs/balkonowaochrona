@@ -64,7 +64,7 @@ jobs:
             --restart unless-stopped \
             --network host \
             -e PORT=4001 \
-            -e TO_EMAIL=kalkowski123@gmail.com \
+            -e TO_EMAIL=dariusz.finster@gmail.com \
             -e FROM_EMAIL=onboarding@resend.dev \
             -e RESEND_API_KEY="$RESEND_API_KEY" \
             $IMAGE_NAME:latest
