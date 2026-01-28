@@ -69,7 +69,7 @@ jobs:
             --restart unless-stopped \
             --network kamal \
             -e PORT=4001 \
-            -e TO_EMAIL=dariusz.finster@gmail.com \
+            -e TO_EMAIL=kontakt@balkonowaochrona.pl \
             -e FROM_EMAIL=kontakt@balkonowaochrona.pl \
             -e RESEND_API_KEY="$RESEND_API_KEY" \
             $IMAGE_NAME:latest
