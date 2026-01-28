@@ -33,6 +33,7 @@ COPY --from=builder /app/server .
 COPY index.html .
 COPY style.css .
 COPY favicon.svg .
+COPY photos/ ./photos/
 
 # Expose port
 EXPOSE 4001

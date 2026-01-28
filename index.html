@@ -25,9 +25,16 @@
     <header class="header">
         <div class="container">
             <div class="logo">
-                <h1>Balkonowa ochrona</h1>
-                <p class="tagline">Siatki • Prace na WYSOKOŚCI</p>
+                <a href="/" style="text-decoration: none; color: inherit;">
+                    <h1>Balkonowa ochrona</h1>
+                    <p class="tagline">Siatki • Prace na WYSOKOŚCI</p>
+                </a>
             </div>
+            <nav class="main-nav">
+                <a href="#uslugi" class="nav-link">Usługi</a>
+                <a href="#galeria" class="nav-link">Galeria</a>
+                <a href="#kontakt" class="nav-link">Kontakt</a>
+            </nav>
             <div class="contact-info">
                 <a href="tel:503508987" class="contact-link phone">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -56,7 +63,7 @@
             </div>
         </section>
 
-        <section class="services">
+        <section class="services" id="uslugi">
             <div class="container">
                 <h2 class="section-title">Nasze Usługi</h2>
                 <div class="services-grid">
@@ -96,6 +103,54 @@
                 </div>
             </div>
         </section>
+
+        <section class="gallery" id="galeria">
+            <div class="container">
+                <h2 class="section-title">Galeria realizacji</h2>
+                <div class="gallery-grid">
+                    <div class="gallery-item" data-index="0">
+                        <img src="photos/IMG20240122120930.jpg" alt="Realizacja montażu siatki balkonowej" loading="lazy">
+                    </div>
+                    <div class="gallery-item" data-index="1">
+                        <img src="photos/IMG20240819085828.jpg" alt="Siatka ochronna na balkonie" loading="lazy">
+                    </div>
+                    <div class="gallery-item" data-index="2">
+                        <img src="photos/IMG20241014143201.jpg" alt="Profesjonalny montaż siatki" loading="lazy">
+                    </div>
+                    <div class="gallery-item" data-index="3">
+                        <img src="photos/IMG20241014143204.jpg" alt="Zabezpieczenie balkonu siatką" loading="lazy">
+                    </div>
+                    <div class="gallery-item" data-index="4">
+                        <img src="photos/IMG20250304112734.jpg" alt="Montaż siatki na wysokości" loading="lazy">
+                    </div>
+                    <div class="gallery-item" data-index="5">
+                        <img src="photos/IMG20250304112753.jpg" alt="Ochrona balkonu przed ptakami" loading="lazy">
+                    </div>
+                    <div class="gallery-item" data-index="6">
+                        <img src="photos/IMG20250322171826.jpg" alt="Siatka balkonowa realizacja" loading="lazy">
+                    </div>
+                    <div class="gallery-item" data-index="7">
+                        <img src="photos/IMG20250329093104.jpg" alt="Profesjonalne prace na wysokości" loading="lazy">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Lightbox Modal -->
+        <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Powiększone zdjęcie">
+            <button class="lightbox-close" aria-label="Zamknij">&times;</button>
+            <button class="lightbox-prev" aria-label="Poprzednie zdjęcie">&#10094;</button>
+            <button class="lightbox-next" aria-label="Następne zdjęcie">&#10095;</button>
+            <div class="lightbox-content">
+                <img src="" alt="" id="lightbox-img">
+                <div class="lightbox-zoom-controls">
+                    <button class="zoom-in" aria-label="Powiększ">+</button>
+                    <button class="zoom-out" aria-label="Pomniejsz">−</button>
+                    <button class="zoom-reset" aria-label="Resetuj powiększenie">1:1</button>
+                </div>
+            </div>
+            <div class="lightbox-counter"><span id="lightbox-current">1</span> / <span id="lightbox-total">8</span></div>
+        </div>
 
         <section class="contact" id="kontakt">
             <div class="container">
@@ -149,6 +204,133 @@
     </footer>
 
     <script>
+        // Gallery Lightbox functionality
+        const galleryItems = document.querySelectorAll('.gallery-item');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        const lightboxCurrent = document.getElementById('lightbox-current');
+        const lightboxTotal = document.getElementById('lightbox-total');
+        const closeBtn = document.querySelector('.lightbox-close');
+        const prevBtn = document.querySelector('.lightbox-prev');
+        const nextBtn = document.querySelector('.lightbox-next');
+        const zoomInBtn = document.querySelector('.zoom-in');
+        const zoomOutBtn = document.querySelector('.zoom-out');
+        const zoomResetBtn = document.querySelector('.zoom-reset');
+
+        let currentIndex = 0;
+        let currentZoom = 1;
+        const images = Array.from(galleryItems).map(item => item.querySelector('img').src);
+        
+        lightboxTotal.textContent = images.length;
+
+        function openLightbox(index) {
+            currentIndex = index;
+            currentZoom = 1;
+            updateLightbox();
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            lightbox.classList.remove('active');
+            document.body.style.overflow = '';
+            currentZoom = 1;
+            lightboxImg.style.transform = 'scale(1)';
+        }
+
+        function updateLightbox() {
+            lightboxImg.src = images[currentIndex];
+            lightboxImg.alt = galleryItems[currentIndex].querySelector('img').alt;
+            lightboxCurrent.textContent = currentIndex + 1;
+            lightboxImg.style.transform = `scale(${currentZoom})`;
+        }
+
+        function showNext() {
+            currentIndex = (currentIndex + 1) % images.length;
+            currentZoom = 1;
+            updateLightbox();
+        }
+
+        function showPrev() {
+            currentIndex = (currentIndex - 1 + images.length) % images.length;
+            currentZoom = 1;
+            updateLightbox();
+        }
+
+        function zoomIn() {
+            currentZoom = Math.min(currentZoom + 0.5, 4);
+            lightboxImg.style.transform = `scale(${currentZoom})`;
+        }
+
+        function zoomOut() {
+            currentZoom = Math.max(currentZoom - 0.5, 0.5);
+            lightboxImg.style.transform = `scale(${currentZoom})`;
+        }
+
+        function zoomReset() {
+            currentZoom = 1;
+            lightboxImg.style.transform = 'scale(1)';
+        }
+
+        // Event listeners for gallery
+        galleryItems.forEach((item, index) => {
+            item.addEventListener('click', () => openLightbox(index));
+        });
+
+        closeBtn.addEventListener('click', closeLightbox);
+        prevBtn.addEventListener('click', showPrev);
+        nextBtn.addEventListener('click', showNext);
+        zoomInBtn.addEventListener('click', zoomIn);
+        zoomOutBtn.addEventListener('click', zoomOut);
+        zoomResetBtn.addEventListener('click', zoomReset);
+
+        // Close on backdrop click
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) closeLightbox();
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (!lightbox.classList.contains('active')) return;
+            
+            switch(e.key) {
+                case 'Escape':
+                    closeLightbox();
+                    break;
+                case 'ArrowLeft':
+                    showPrev();
+                    break;
+                case 'ArrowRight':
+                    showNext();
+                    break;
+                case '+':
+                case '=':
+                    zoomIn();
+                    break;
+                case '-':
+                    zoomOut();
+                    break;
+            }
+        });
+
+        // Touch swipe support for mobile
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        lightbox.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        lightbox.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            const diff = touchStartX - touchEndX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) showNext();
+                else showPrev();
+            }
+        }, { passive: true });
+
+        // Contact form functionality
         const form = document.getElementById('contact-form');
         
         form.addEventListener('submit', async (e) => {
