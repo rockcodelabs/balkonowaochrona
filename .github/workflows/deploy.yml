@@ -79,10 +79,53 @@ jobs:
             echo "✅ jq already installed"
           fi
 
-      - name: Setup Ruby gem paths
+      - name: Configure hostname resolution
         run: |
-          echo "GEM_HOME=$(ruby -r rubygems -e 'puts Gem.user_dir')" >> $GITHUB_ENV
-          echo "$(ruby -r rubygems -e 'puts Gem.user_dir')/bin" >> $GITHUB_PATH
+          # Map pi5main.local to localhost for runner container
+          echo "127.0.0.1 pi5main.local" | sudo tee -a /etc/hosts
+          echo "✅ Added pi5main.local to /etc/hosts"
+
+      - name: Set up Ruby 3.2.2 with ruby-build
+        run: |
+          RUBY_VERSION="3.2.2"
+          RUBY_INSTALL_DIR="/opt/hostedtoolcache/Ruby/${RUBY_VERSION}/arm64"
+
+          # Check if Ruby is already installed in tool cache
+          if [ -f "${RUBY_INSTALL_DIR}.complete" ]; then
+            echo "✅ Ruby ${RUBY_VERSION} already installed in tool cache"
+          else
+            echo "Installing Ruby ${RUBY_VERSION} to tool cache..."
+
+            # Install ruby-build if not present
+            if ! command -v ruby-build &> /dev/null; then
+              echo "Installing ruby-build..."
+              git clone https://github.com/rbenv/ruby-build.git /tmp/ruby-build
+              sudo /tmp/ruby-build/install.sh
+              rm -rf /tmp/ruby-build
+            fi
+
+            # Install build dependencies
+            sudo apt-get update -qq
+            sudo apt-get install -y build-essential libssl-dev libreadline-dev zlib1g-dev
+
+            # Create tool cache directory
+            sudo mkdir -p /opt/hostedtoolcache/Ruby
+            sudo chown -R $USER:$USER /opt/hostedtoolcache
+
+            # Build Ruby
+            ruby-build ${RUBY_VERSION} ${RUBY_INSTALL_DIR}
+
+            # Mark as complete
+            touch ${RUBY_INSTALL_DIR}.complete
+
+            echo "✅ Ruby ${RUBY_VERSION} installed successfully"
+          fi
+
+          # Add Ruby to PATH
+          echo "${RUBY_INSTALL_DIR}/bin" >> $GITHUB_PATH
+
+          # Verify installation
+          ${RUBY_INSTALL_DIR}/bin/ruby -v
 
       - name: Install Kamal
         run: |
@@ -90,6 +133,42 @@ jobs:
             gem install kamal --no-document
           fi
           kamal version
+
+      - name: Set up SSH for deployment
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # Generate SSH key if not exists
+          if [ ! -f ~/.ssh/id_ed25519 ]; then
+            ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -C "github-actions-runner"
+            echo "✅ Generated new SSH key"
+          else
+            echo "✅ SSH key already exists"
+          fi
+
+          # Add runner's public key to host's authorized_keys using Docker volume mount
+          echo "Adding SSH key to host..."
+          docker run --rm -v /home:/hosthome alpine sh -c "
+            mkdir -p /hosthome/rege/.ssh
+            chmod 700 /hosthome/rege/.ssh
+            grep -qF '$(cat ~/.ssh/id_ed25519.pub)' /hosthome/rege/.ssh/authorized_keys 2>/dev/null || echo '$(cat ~/.ssh/id_ed25519.pub)' >> /hosthome/rege/.ssh/authorized_keys
+            chmod 600 /hosthome/rege/.ssh/authorized_keys
+          "
+          echo "✅ SSH key added to host"
+
+          # Configure SSH client
+          cat > ~/.ssh/config << 'EOF'
+          Host pi5main.local localhost 127.0.0.1
+            User rege
+            IdentityFile ~/.ssh/id_ed25519
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            IdentitiesOnly yes
+          EOF
+          chmod 600 ~/.ssh/config
+
+          echo "✅ SSH configured"
 
       - name: Login to Docker Hub
         run: |
