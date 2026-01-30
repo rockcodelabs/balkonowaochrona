@@ -80,7 +80,7 @@ func handleStatic(w http.ResponseWriter, r *http.Request) {
 
 	// Check if file exists
 	info, err := os.Stat(filePath)
-	if os.IsNotExist(err) || info.IsDir() {
+	if err != nil || info.IsDir() {
 		http.NotFound(w, r)
 		return
 	}
